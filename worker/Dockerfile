@@ -1,10 +1,13 @@
-FROM python:3.11-slim
-RUN useradd -m -u 1001 worker
+FROM python:3.11-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+FROM python:3.11-slim
+RUN useradd -m -u 1001 -s /bin/bash worker
+WORKDIR /app
+COPY --from=builder /root/.local /home/worker/.local
 COPY --chown=worker:worker . .
 USER worker
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
-  CMD python -c "import redis; r=redis.Redis(host='redis'); r.ping()" || exit 1
+ENV PATH=/home/worker/.local/bin:$PATH
 CMD ["python", "worker.py"]
