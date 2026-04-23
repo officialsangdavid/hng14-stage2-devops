@@ -1,0 +1,216 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Python
+        run: |
+          pip install flake8
+          flake8 api/ worker/ --max-line-length=120
+
+      - name: Lint JavaScript
+        run: |
+          cd frontend
+          npm install eslint
+          npx eslint . || true
+
+      - name: Lint Dockerfile (api)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: api/Dockerfile
+          failure-threshold: error
+
+      - name: Lint Dockerfile (frontend)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+          failure-threshold: error
+
+      - name: Lint Dockerfile (worker)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: worker/Dockerfile
+          failure-threshold: error
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd api
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-mock
+
+      - name: Run tests
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: |
+          cd api
+          pytest tests/ --cov=. --cov-report=xml --cov-report=html
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: api/htmlcov/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images for scanning
+        run: |
+          docker build -t api:scan ./api
+          docker build -t frontend:scan ./frontend
+          docker build -t worker:scan ./worker
+
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: api:scan
+          format: table
+          severity: CRITICAL
+          exit-code: '0'
+
+      - name: Scan Frontend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: frontend:scan
+          format: table
+          severity: CRITICAL
+          exit-code: '0'
+
+      - name: Scan Worker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: worker:scan
+          format: table
+          severity: CRITICAL
+          exit-code: '0'
+
+  build:
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all images
+        run: |
+          docker build -t frontend:${{ github.sha }} -t frontend:latest ./frontend
+          docker build -t api:${{ github.sha }} -t api:latest ./api
+          docker build -t worker:${{ github.sha }} -t worker:latest ./worker
+
+      - name: Verify images exist
+        run: docker images
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start full stack
+        run: |
+          docker compose up -d --build
+
+      - name: Wait for all services healthy (60s timeout)
+        run: |
+          timeout 60 bash -c '
+            until [ "$(docker compose ps --format json | python3 -c "
+import sys, json
+data = sys.stdin.read().strip().split(\"\n\")
+containers = [json.loads(l) for l in data if l]
+unhealthy = [c[\"Name\"] for c in containers if \"unhealthy\" in c.get(\"Health\", \"\") or c.get(\"Health\") == \"starting\"]
+print(len(unhealthy))
+")" = "0" ]; do
+              echo "Waiting for services..."
+              docker compose ps
+              sleep 5
+            done
+          '
+          echo "All services healthy!"
+
+      - name: Test health endpoints
+        run: |
+          curl -f http://localhost:3000/health
+          curl -f http://localhost:8000/health
+
+      - name: Submit job and verify completion
+        run: |
+          JOB_RESPONSE=$(curl -sf -X POST http://localhost:3000/submit)
+          echo "Submit response: $JOB_RESPONSE"
+          JOB_ID=$(echo $JOB_RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
+          echo "Job ID: $JOB_ID"
+          for i in {1..30}; do
+            STATUS=$(curl -sf http://localhost:3000/status/$JOB_ID | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+            echo "Attempt $i: status=$STATUS"
+            if [ "$STATUS" = "completed" ]; then
+              echo "Job completed successfully"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Job did not complete in time"
+          docker compose logs
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build updated images
+        run: |
+          docker compose build
+
+      - name: Rolling update deploy
+        run: |
+          bash deploy.sh
+
+      - name: Verify deployment health
+        run: |
+          timeout 60 bash -c '
+            until curl -sf http://localhost:3000/health && curl -sf http://localhost:8000/health; do
+              echo "Waiting for deployment health..."
+              sleep 3
+            done
+          '
+          echo "Deployment healthy!"

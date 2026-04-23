@@ -3,10 +3,16 @@ const axios = require('axios');
 const path = require('path');
 const app = express();
 
-const API_URL = "http://localhost:8000";
+// FIX: Use environment variable instead of hardcoded localhost
+const API_URL = process.env.API_URL || "http://api:8000";
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'views')));
+
+// FIX: Added health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy' });
+});
 
 app.post('/submit', async (req, res) => {
   try {
@@ -26,6 +32,7 @@ app.get('/status/:id', async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log('Frontend running on port 3000');
+// FIX: Bind to 0.0.0.0 to accept external connections
+app.listen(3000, '0.0.0.0', () => {
+  console.log('Frontend running on 0.0.0.0:3000');
 });

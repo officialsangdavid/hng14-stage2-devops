@@ -5,7 +5,20 @@ import os
 
 app = FastAPI()
 
-r = redis.Redis(host="localhost", port=6379)
+# FIX: Use environment variables instead of hardcoded localhost
+r = redis.Redis(
+    host=os.getenv("REDIS_HOST", "redis"),
+    port=int(os.getenv("REDIS_PORT", 6379))
+)
+
+# FIX: Added health check endpoint
+@app.get("/health")
+def health():
+    try:
+        r.ping()
+        return {"status": "healthy"}
+    except:
+        return {"status": "unhealthy"}, 503
 
 @app.post("/jobs")
 def create_job():
