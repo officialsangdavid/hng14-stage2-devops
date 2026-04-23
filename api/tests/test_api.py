@@ -30,14 +30,16 @@ def test_submit_job(mock_redis):
     mock_redis.lpush.return_value = True
     response = client.post("/submit")
     assert response.status_code == 200
-    assert "job_id" in response.json()
+    data = response.json()
+    assert "job_id" in data
 
 
 def test_get_status_completed(mock_redis):
     mock_redis.hget.return_value = b"completed"
     response = client.get("/status/test-job-id")
     assert response.status_code == 200
-    assert response.json()["status"] == "completed"
+    data = response.json()
+    assert data["status"] == "completed"
 
 
 def test_get_status_not_found(mock_redis):

@@ -4,7 +4,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim
-RUN useradd -m -u 1001 apiuser
+RUN useradd -m -u 1001 -s /bin/bash apiuser
 WORKDIR /app
 COPY --from=builder /root/.local /home/apiuser/.local
 COPY --chown=apiuser:apiuser . .
