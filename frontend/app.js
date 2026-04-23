@@ -16,7 +16,7 @@ app.get('/health', (req, res) => {
 
 app.post('/submit', async (req, res) => {
   try {
-    const response = await axios.post(`${API_URL}/jobs`);
+    const response = await axios.post(`${API_URL}/submit`);
     res.json(response.data);
   } catch (err) {
     res.status(500).json({ error: "something went wrong" });
@@ -25,7 +25,7 @@ app.post('/submit', async (req, res) => {
 
 app.get('/status/:id', async (req, res) => {
   try {
-    const response = await axios.get(`${API_URL}/jobs/${req.params.id}`);
+    const response = await axios.get(`${API_URL}/submit/${req.params.id}`);
     res.json(response.data);
   } catch (err) {
     res.status(500).json({ error: "something went wrong" });
