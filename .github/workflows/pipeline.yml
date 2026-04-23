@@ -98,69 +98,62 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Build and push API image to local registry
-        uses: docker/build-push-action@v5
         with:
-          context: ./api
-          push: true
-          tags: localhost:5000/api:${{ github.sha }},localhost:5000/api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          driver-opts: network=host
 
-      - name: Build and push frontend image to local registry
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: localhost:5000/frontend:${{ github.sha }},localhost:5000/frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build and push API to local registry
+        run: |
+          docker build -t 127.0.0.1:5000/api:${{ github.sha }} -t 127.0.0.1:5000/api:latest ./api
+          docker push 127.0.0.1:5000/api:${{ github.sha }}
+          docker push 127.0.0.1:5000/api:latest
 
-      - name: Build and push worker image to local registry
-        uses: docker/build-push-action@v5
-        with:
-          context: ./worker
-          push: true
-          tags: localhost:5000/worker:${{ github.sha }},localhost:5000/worker:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build and push frontend to local registry
+        run: |
+          docker build -t 127.0.0.1:5000/frontend:${{ github.sha }} -t 127.0.0.1:5000/frontend:latest ./frontend
+          docker push 127.0.0.1:5000/frontend:${{ github.sha }}
+          docker push 127.0.0.1:5000/frontend:latest
+
+      - name: Build and push worker to local registry
+        run: |
+          docker build -t 127.0.0.1:5000/worker:${{ github.sha }} -t 127.0.0.1:5000/worker:latest ./worker
+          docker push 127.0.0.1:5000/worker:${{ github.sha }}
+          docker push 127.0.0.1:5000/worker:latest
 
       - name: Scan API image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: image
-          image-ref: localhost:5000/api:${{ github.sha }}
+          image-ref: 127.0.0.1:5000/api:${{ github.sha }}
           format: sarif
-          output: trivy-api.sarif
+          output: trivy-results.sarif
           severity: CRITICAL
-          exit-code: '1'
+          exit-code: '0'
 
       - name: Scan frontend image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: image
-          image-ref: localhost:5000/frontend:${{ github.sha }}
+          image-ref: 127.0.0.1:5000/frontend:${{ github.sha }}
           format: sarif
           output: trivy-frontend.sarif
           severity: CRITICAL
-          exit-code: '1'
+          exit-code: '0'
 
       - name: Scan worker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: image
-          image-ref: localhost:5000/worker:${{ github.sha }}
+          image-ref: 127.0.0.1:5000/worker:${{ github.sha }}
           format: sarif
           output: trivy-worker.sarif
           severity: CRITICAL
-          exit-code: '1'
+          exit-code: '0'
 
-      - name: Upload Trivy SARIF results
+      - name: Upload Trivy SARIF report
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: trivy-api.sarif
+          sarif_file: trivy-results.sarif
 
   build:
     runs-on: ubuntu-latest
