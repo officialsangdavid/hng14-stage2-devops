@@ -7,10 +7,10 @@ SERVICE="frontend"
 echo "Starting rolling update for $SERVICE..."
 
 # Build new image
-docker-compose build $SERVICE
+docker compose build $SERVICE
 
 # Start new container
-docker-compose up -d --no-deps $SERVICE
+docker compose up -d --no-deps $SERVICE
 
 # Wait for health check
 START=$(date +%s)
@@ -20,11 +20,11 @@ while true; do
   
   if [ $ELAPSED -gt $TIMEOUT ]; then
     echo "Health check timeout after ${TIMEOUT}s - rolling back"
-    docker-compose restart $SERVICE
+    docker compose restart $SERVICE
     exit 1
   fi
   
-  if docker-compose ps $SERVICE | grep -q "healthy"; then
+  if docker compose ps $SERVICE | grep -q "healthy"; then
     echo "New container is healthy - deployment successful"
     break
   fi
