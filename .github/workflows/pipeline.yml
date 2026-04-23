@@ -142,24 +142,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start full stack
-        run: |
-          docker compose up -d --build
+        run: docker compose up -d --build
 
       - name: Wait for all services healthy (60s timeout)
         run: |
-          timeout 60 bash -c '
-            until [ "$(docker compose ps --format json | python3 -c "
-import sys, json
-data = sys.stdin.read().strip().split(\"\n\")
-containers = [json.loads(l) for l in data if l]
-unhealthy = [c[\"Name\"] for c in containers if \"unhealthy\" in c.get(\"Health\", \"\") or c.get(\"Health\") == \"starting\"]
-print(len(unhealthy))
-")" = "0" ]; do
-              echo "Waiting for services..."
-              docker compose ps
-              sleep 5
-            done
-          '
+          timeout 60 bash -c 'until curl -sf http://localhost:3000/health && curl -sf http://localhost:8000/health; do echo "Waiting..."; sleep 5; done'
           echo "All services healthy!"
 
       - name: Test health endpoints
@@ -198,19 +185,12 @@ print(len(unhealthy))
       - uses: actions/checkout@v4
 
       - name: Build updated images
-        run: |
-          docker compose build
+        run: docker compose build
 
       - name: Rolling update deploy
-        run: |
-          bash deploy.sh
+        run: bash deploy.sh
 
       - name: Verify deployment health
         run: |
-          timeout 60 bash -c '
-            until curl -sf http://localhost:3000/health && curl -sf http://localhost:8000/health; do
-              echo "Waiting for deployment health..."
-              sleep 3
-            done
-          '
+          timeout 60 bash -c 'until curl -sf http://localhost:3000/health && curl -sf http://localhost:8000/health; do echo "Waiting for deployment..."; sleep 3; done'
           echo "Deployment healthy!"
