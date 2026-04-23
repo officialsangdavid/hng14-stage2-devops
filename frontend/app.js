@@ -25,7 +25,7 @@ app.post('/submit', async (req, res) => {
 
 app.get('/status/:id', async (req, res) => {
   try {
-    const response = await axios.get(`${API_URL}/submit/${req.params.id}`);
+    const response = await axios.get(`${API_URL}/status/${req.params.id}`);
     res.json(response.data);
   } catch (err) {
     res.status(500).json({ error: "something went wrong" });
