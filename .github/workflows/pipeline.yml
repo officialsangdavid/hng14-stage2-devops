@@ -154,6 +154,19 @@ jobs:
           curl -f http://localhost:3000/health
           curl -f http://localhost:8000/health
 
+      - name: Debug - check what submit returns
+        run: |
+          echo "=== Testing submit endpoint ==="
+          curl -v -X POST http://localhost:3000/submit || true
+          echo "=== Testing direct API submit ==="
+          curl -v -X POST http://localhost:8000/submit || true
+          echo "=== Docker compose ps ==="
+          docker compose ps
+          echo "=== Frontend logs ==="
+          docker compose logs frontend --tail 20
+          echo "=== API logs ==="
+          docker compose logs api --tail 20
+
       - name: Submit job and verify completion
         run: |
           JOB_RESPONSE=$(curl -sf -X POST http://localhost:3000/submit)
