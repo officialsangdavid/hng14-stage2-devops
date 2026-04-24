@@ -1,4 +1,4 @@
-# HNG14 Stage 2 DevOps - Containerized Microservices Application
+# DevOps - Containerized Microservices Application
 
 ## Overview
 
@@ -17,7 +17,7 @@ This project takes a broken multi-service application and fixes it, containerize
 ---
 
 ## Project Structure
-hng14-stage2-devops/
+devops/
 ├── api/                    # FastAPI Python backend
 │   ├── Dockerfile
 │   ├── main.py
@@ -70,8 +70,8 @@ docker compose version
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/officialsangdavid/hng14-stage2-devops.git
-cd hng14-stage2-devops
+git clone https://github.com/officialsangdavid/project-repo
+cd project-0cloned
 ```
 
 ### Step 2: Set Up Environment Variables
@@ -103,11 +103,11 @@ docker compose ps
 ```
 
 ### What a Successful Startup Looks Like
-NAME                             IMAGE                          STATUS
-hng14-stage2-devops-api-1        hng14-stage2-devops-api        Up (healthy)
-hng14-stage2-devops-frontend-1   hng14-stage2-devops-frontend   Up (healthy)
-hng14-stage2-devops-redis-1      redis:7-alpine                 Up (healthy)
-hng14-stage2-devops-worker-1     hng14-stage2-devops-worker     Up
+NAME               IMAGE                          STATUS
+devops-api-1       devops-api        Up (healthy)
+devops-frontend-1   frontend   Up (healthy)
+devops-redis-1      redis:7-alpine                 Up (healthy)
+devops-worker-1    devops-worker     Up
 
 All services should show Up and the API, frontend, and Redis should show (healthy).
 
